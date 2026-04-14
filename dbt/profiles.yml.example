@@ -1,0 +1,14 @@
+# Copy this file to profiles.yml and fill in your values
+# NEVER commit profiles.yml — it contains your token
+
+bookworm_databricks:
+  target: dev
+  outputs:
+    dev:
+      type: databricks
+      host: "adb-XXXXXXXXX.XX.azuredatabricks.net"
+      http_path: "/sql/protocolv1/o/XXXXXXXXX/XXXXXXXXX"
+      token: "dapiXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+      catalog: piagroup_assessment_bookworm
+      schema: bookworm
+      threads: 4
