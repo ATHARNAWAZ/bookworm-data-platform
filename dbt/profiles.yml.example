@@ -1,14 +1,43 @@
+# ============================================================
+# BookWorm dbt Connection Profile — EXAMPLE
+# ============================================================
 # Copy this file to profiles.yml and fill in your values
-# NEVER commit profiles.yml — it contains your token
+#
+# cp profiles.yml.example profiles.yml
+#
+# IMPORTANT: profiles.yml is in .gitignore
+# NEVER commit your real token to GitHub
+# ============================================================
 
 bookworm_databricks:
   target: dev
   outputs:
     dev:
       type: databricks
-      host: "adb-XXXXXXXXX.XX.azuredatabricks.net"
-      http_path: "/sql/protocolv1/o/XXXXXXXXX/XXXXXXXXX"
-      token: "dapiXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+      # Your Databricks workspace URL
+      # Example: adb-1234567890.12.azuredatabricks.net
+      host: "YOUR_DATABRICKS_HOST"
+
+      # SQL Warehouse HTTP Path
+      # Found in: Compute → SQL Warehouses → Connection details
+      # Example: /sql/protocolv1/o/1234567890/0413-164421-abc123
+      http_path: "YOUR_HTTP_PATH"
+
+      # Personal Access Token
+      # Generate in: Settings → Developer → Access tokens
+      # Example: dapi1234567890abcdef1234567890abcdef
+      token: "YOUR_DATABRICKS_TOKEN"
+
+      # Unity Catalog settings — do not change these
       catalog: piagroup_assessment_bookworm
       schema: bookworm
       threads: 4
+
+    prod:
+      type: databricks
+      host: "YOUR_DATABRICKS_HOST"
+      http_path: "YOUR_HTTP_PATH"
+      token: "YOUR_DATABRICKS_TOKEN"
+      catalog: piagroup_assessment_bookworm
+      schema: bookworm
+      threads: 8

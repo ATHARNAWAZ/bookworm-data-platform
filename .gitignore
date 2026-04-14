@@ -217,4 +217,4 @@ dbt/dbt_packages/
 # Azure credentials
 *.key
 *.pem
-EOF
+EOFdbt/profiles.yml
