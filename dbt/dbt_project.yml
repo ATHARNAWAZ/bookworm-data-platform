@@ -1,0 +1,35 @@
+name: 'bookworm'
+version: '1.0.0'
+config-version: 2
+
+profile: 'bookworm_databricks'
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+seed-paths: ["seeds"]
+
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  bookworm:
+    staging:
+      +materialized: view
+      +schema: silver
+    intermediate:
+      +materialized: view
+      +schema: silver
+    marts:
+      +materialized: table
+      +schema: gold
+
+vars:
+  # Audiobook scoring weights
+  # Adjustable by business without code changes
+  rating_weight: 0.40
+  popularity_weight: 0.30
+  sentiment_weight: 0.30
+  # Minimum ratings thresholds
+  min_ratings_high: 100000
+  min_ratings_medium: 10000

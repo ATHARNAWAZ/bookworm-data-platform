@@ -1,0 +1,43 @@
+version: 2
+
+models:
+  - name: mart_audiobook_candidates
+    description: >
+      Primary business output. Ranked audiobook candidates
+      scored by weighted formula combining rating quality,
+      popularity, and reader sentiment.
+    columns:
+      - name: audiobook_rank
+        description: "Overall rank — 1 is best candidate"
+        tests:
+          - not_null
+      - name: book_id
+        description: "Unique book identifier"
+        tests:
+          - not_null
+          - unique
+      - name: weighted_score
+        description: "Composite score 0 to 1"
+        tests:
+          - not_null
+      - name: primary_genre
+        tests:
+          - not_null
+
+  - name: mart_genre_performance
+    description: "Genre-level aggregation for portfolio strategy"
+    columns:
+      - name: genre
+        tests:
+          - not_null
+          - unique
+      - name: genre_rank
+        tests:
+          - not_null
+
+  - name: mart_author_performance
+    description: "Author performance for partnership decisions"
+    columns:
+      - name: author_rank
+        tests:
+          - not_null

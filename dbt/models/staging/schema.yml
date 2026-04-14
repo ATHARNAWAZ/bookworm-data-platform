@@ -1,0 +1,80 @@
+version: 2
+
+sources:
+  - name: bronze
+    catalog: piagroup_assessment_bookworm
+    schema: bookworm
+    description: "Raw GoodReads data in Delta Lake"
+    tables:
+      - name: bronze_books
+        description: "Raw book metadata from GoodReads"
+        columns:
+          - name: book_id
+            tests:
+              - not_null
+          - name: title
+            tests:
+              - not_null
+      - name: bronze_reviews
+        description: "Raw reader reviews"
+        columns:
+          - name: review_id
+            tests:
+              - not_null
+          - name: book_id
+            tests:
+              - not_null
+
+models:
+  - name: stg_books
+    description: "Cleaned and standardised book metadata"
+    columns:
+      - name: book_id
+        description: "Unique book identifier"
+        tests:
+          - not_null
+          - unique
+      - name: title
+        description: "Book title"
+        tests:
+          - not_null
+      - name: average_rating
+        description: "Average rating cast to double (0-5)"
+        tests:
+          - not_null
+      - name: data_quality_flag
+        description: "Confidence level based on ratings count"
+        tests:
+          - accepted_values:
+              values:
+                - high_confidence
+                - medium_confidence
+                - low_confidence
+
+  - name: stg_reviews
+    description: "Cleaned reviews with PII hashed and sentiment tagged"
+    columns:
+      - name: review_id
+        description: "Unique review identifier"
+        tests:
+          - not_null
+          - unique
+      - name: book_id
+        description: "Foreign key to stg_books"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_books')
+              field: book_id
+      - name: sentiment
+        description: "Derived sentiment classification"
+        tests:
+          - accepted_values:
+              values:
+                - positive
+                - neutral
+                - negative
+      - name: user_id_hashed
+        description: "SHA256 hash of user_id for GDPR compliance"
+        tests:
+          - not_null
