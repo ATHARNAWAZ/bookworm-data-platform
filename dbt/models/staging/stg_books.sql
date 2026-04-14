@@ -1,12 +1,19 @@
 /*
   Model    : stg_books
   Layer    : Staging (Silver)
-  Source   : bronze_books (raw GoodReads JSON)
+  Source   : bronze_books (real GoodReads — 2.3M books)
   Consumer : int_books_enriched
 
   Business Purpose:
-  Clean and standardise raw book data from GoodReads.
-  One row per unique book. Foundation for all book analysis.
+  Standardise and validate real GoodReads book metadata.
+  One row per unique book. Foundation for all analysis.
+
+  Key Transformations:
+  - Deduplicate using latest ingestion timestamp
+  - Extract primary author from nested authors array
+  - Extract primary genre from genres array
+  - Calculate data quality confidence flag
+  - Cast numeric fields from string to proper types
 */
 
 WITH source AS (
@@ -27,25 +34,29 @@ cleaned AS (
         book_id,
         title,
 
-        -- WHY: Cast to double for numerical analysis
-        -- Source has ratings as strings
+        -- WHY: Extract first author from nested array
+        -- authors is array of structs: [{author_id, role}]
+        -- Primary author drives audiobook rights decisions
+        authors[0].author_id                        AS primary_author_id,
+
+        -- WHY: Cast to double for numerical scoring
+        -- Source stores all ratings as strings
         CAST(average_rating AS DOUBLE)              AS average_rating,
         CAST(ratings_count AS BIGINT)               AS ratings_count,
-
-        -- WHY: Extract first genre from array as primary
-        COALESCE(
-            genres[0], 'Uncategorised'
-        )                                           AS primary_genre,
-
-        -- WHY: Keep all genres as string for multi-genre analysis
-        CONCAT_WS(', ', genres)                     AS all_genres,
+        CAST(text_reviews_count AS BIGINT)          AS text_reviews_count,
 
         description,
 
-        -- WHY: Calculate quality flag here in staging
-        -- Tells analysts how much to trust the rating signal
-        -- 5 reviews at 5 stars means nothing statistically
-        -- 500,000 reviews at 4.5 stars is highly reliable
+        -- WHY: Extract primary genre from array
+        -- First genre is the dominant classification
+        -- Fallback to Uncategorised for null genres
+        COALESCE(genres[0], 'Uncategorised')        AS primary_genre,
+
+        -- WHY: Quality flag based on ratings count
+        -- Statistical reliability threshold:
+        -- 5 reviews at 5 stars = unreliable signal
+        -- 100K reviews at 4.5 stars = highly reliable
+        -- Only high/medium confidence books reach Gold
         CASE
             WHEN CAST(ratings_count AS BIGINT)
                 >= {{ var('min_ratings_high') }}
@@ -61,9 +72,14 @@ cleaned AS (
 
     FROM deduplicated
     WHERE rn = 1
-      AND average_rating IS NOT NULL
-      AND title IS NOT NULL
       AND book_id IS NOT NULL
+      AND title IS NOT NULL
+      AND average_rating IS NOT NULL
+      -- WHY: Some GoodReads records have non-numeric
+      -- average_rating values. CAST produces NULL.
+      -- We filter these at staging boundary.
+      AND CAST(average_rating AS DOUBLE) IS NOT NULL
+      AND CAST(average_rating AS DOUBLE) > 0
 )
 
 SELECT * FROM cleaned

@@ -5,9 +5,17 @@
   Consumer : int_books_enriched
 
   Business Purpose:
-  Clean review data. Hash PII. Classify sentiment.
-  
-  Privacy: user_id SHA256 hashed — GDPR Article 25.
+  Clean review data for sentiment analysis.
+  Hash user_id for GDPR compliance.
+
+  Privacy Note:
+  user_id SHA256 hashed — GDPR Article 25.
+  No raw PII ever reaches Gold or dashboards.
+
+  Sentiment Note:
+  Currently rating-based proxy.
+  Production: Spark NLP on review_text for true sentiment
+  including audiobook-specific signals like narrator quality.
 */
 
 WITH source AS (
@@ -27,26 +35,27 @@ transformed AS (
         review_id,
         book_id,
 
-        -- WHY: Hash raw user_id for GDPR compliance
-        -- Original user identity never stored downstream
-        SHA2(CAST(user_id AS STRING), 256)          AS user_id_hashed,
+        -- GDPR: Hash user_id — never store raw identity
+        SHA2(CAST(user_id AS STRING), 256)      AS user_id_hashed,
 
-        CAST(rating AS INT)                         AS rating,
+        CAST(rating AS INT)                     AS rating,
 
+        -- Sentiment proxy — rating based heuristic
+        -- Production: replace with Spark NLP on review_text
         CASE
             WHEN rating >= 4 THEN 'positive'
             WHEN rating = 3  THEN 'neutral'
             ELSE                  'negative'
-        END                                         AS sentiment,
+        END                                     AS sentiment,
 
         review_text,
-
-        TO_DATE(date_added, 'yyyy-MM-dd')           AS review_date,
+        TO_DATE(date_added, 'yyyy-MM-dd')       AS review_date,
 
         _ingestion_timestamp,
-        CURRENT_TIMESTAMP()                         AS _silver_timestamp
+        CURRENT_TIMESTAMP()                     AS _silver_timestamp
 
     FROM validated
 )
 
 SELECT * FROM transformed
+ORDER BY review_date DESC
