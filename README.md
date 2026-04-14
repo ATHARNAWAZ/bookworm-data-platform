@@ -14,6 +14,37 @@ BookWorm Publishing is launching a new audiobook series and needs data-driven de
 
 **The Answer:** A weighted scoring model combining rating quality (40%), reader popularity (30%), and positive sentiment (30%) — fully parameterised and adjustable by the business.
 
+
+---
+
+## 📊 Live Dashboard
+
+**[Click here to view the BookWorm Audiobook Intelligence Dashboard →](https://adb-7405608220287115.15.azuredatabricks.net/dashboardsv3/01f1382f39881c339c2f7e69ee559dcf/published?o=7405608220287115)**
+
+Built on real GoodReads data — 2.3 million books, 11,124 ranked candidates.
+
+### Dashboard Charts
+
+**Chart 1 — Top 10 Audiobook Candidates**
+Ranked by weighted score combining rating quality, popularity and sentiment.
+Harry Potter and the Sorcerer's Stone leads with score 0.9551 and 4.7M ratings.
+
+**Chart 2 — Genre Performance**
+Fantasy/Paranormal and Fiction dominate with highest average scores.
+Poetry and Children perform surprisingly well due to high rating consistency.
+
+**Chart 3 — Score Breakdown**
+Stacked bar showing rating, popularity and sentiment contribution per title.
+Transparency into WHY each book ranks where it does.
+
+**Chart 4 — Data Quality Distribution**
+2.35M books filtered as low confidence — only 11,124 books with proven
+market validation (10K+ ratings) reach the Gold scoring layer.
+
+**Chart 5 — Best Book Per Genre**
+One actionable recommendation per genre for BookWorm's editorial team.
+
+
 ---
 
 ## Architecture
