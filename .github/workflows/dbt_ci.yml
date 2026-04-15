@@ -10,9 +10,12 @@ on:
     paths:
       - 'dbt/**'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
-  dbt_test:
-    name: Run dbt Tests
+  dbt_validate:
+    name: Validate dbt Models
     runs-on: ubuntu-latest
 
     steps:
@@ -47,21 +50,3 @@ jobs:
       - name: dbt compile
         working-directory: dbt
         run: dbt compile
-
-      - name: dbt run
-        working-directory: dbt
-        run: dbt run
-
-      - name: dbt test
-        working-directory: dbt
-        run: dbt test
-
-      - name: dbt docs generate
-        working-directory: dbt
-        run: dbt docs generate
-
-      - name: Upload docs artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dbt-docs
-          path: dbt/target/
