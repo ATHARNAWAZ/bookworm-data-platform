@@ -1,24 +1,18 @@
 # Databricks notebook source
-# MAGIC %md
-# MAGIC # BookWorm Data Platform
-# MAGIC ## Senior Data Engineer Assignment — PIA Group
-# MAGIC **Built by:** Ather Nawaz  
-# MAGIC **Stack:** Azure ADLS Gen2 · Databricks · Delta Lake · dbt · Unity Catalog
-# MAGIC
-# MAGIC ### Business Problem
-# MAGIC BookWorm Publishing needs data-driven decisions about which books 
-# MAGIC to prioritise for their new audiobook series.
-# MAGIC
-# MAGIC ### Architecture
-# MAGIC RAW (ADLS) → Bronze (Delta) → Silver (dbt) → Gold (dbt) → Dashboard
-# MAGIC
-# MAGIC ### Pipeline
-# MAGIC Run cells 1-7 in order. Total runtime: ~20 minutes.
+#  ## Senior Data Engineer Assignment — PIA Group
+#  **Built by:** Ather Nawaz  
+#  **Stack:** Azure ADLS Gen2 · Databricks · Delta Lake · dbt · Unity Catalog
+#  ### Business Problem
+#  BookWorm Publishing needs data-driven decisions about which books 
+#  to prioritise for their new audiobook series.
+# ### Architecture
+#  RAW (ADLS) → Bronze (Delta) → Silver (dbt) → Gold (dbt) → Dashboard
+# ### Pipeline
+#  Run cells 1-7 in order. Total runtime: ~20 minutes.
 
-# COMMAND ----------
 
 # ============================================================
-# MASTER CONFIGURATION — Run this first
+# MASTER CONFIGURATION
 # ============================================================
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
@@ -51,10 +45,9 @@ def clean_col_names(df):
             df = df.withColumnRenamed(col, clean)
     return df
 
-print("✅ Configuration complete")
+print(" Configuration complete")
 print(f"   Batch ID : {BATCH_ID}")
 
-# COMMAND ----------
 
 # ============================================================
 # VERIFY RAW DATA IN ADLS
@@ -78,13 +71,12 @@ for name, path in datasets.items():
         size = sum(f.size for f in real)
         if size > 0:
             size_str = f"{size/(1024**3):.2f} GB" if size > 1e9 else f"{size/(1024**2):.1f} MB"
-            print(f"   ✅ {name:10} {size_str}")
+            print(f"    {name:10} {size_str}")
         else:
             print(f"   ⏳ {name:10} uploading or empty")
     except:
-        print(f"   ❌ {name:10} not found")
+        print(f"    {name:10} not found")
 
-# COMMAND ----------
 
 # ============================================================
 # CELL 04 — BRONZE INGESTION
@@ -165,8 +157,8 @@ def bronze_ingest(name, raw_path, bronze_path):
         has_checkpoint = False
 
     if has_checkpoint:
-        # ── INCREMENTAL ───────────────────────────────────
-        print(f"   🔄 Incremental — Auto Loader new files only")
+        #INCREMENTAL 
+        print(f"    Incremental — Auto Loader new files only")
         (
             spark.readStream
             .format("cloudFiles")
@@ -189,8 +181,8 @@ def bronze_ingest(name, raw_path, bronze_path):
         )
 
     else:
-        # ── BOOTSTRAP ─────────────────────────────────────
-        print(f"   🆕 Bootstrap — first time full load")
+        # BOOTSTRAP 
+        print(f"    Bootstrap — first time full load")
 
         df = (
             spark.read
@@ -204,7 +196,7 @@ def bronze_ingest(name, raw_path, bronze_path):
             "genres" in df.columns
             and "StructType" in str(df.schema["genres"].dataType)
         ):
-            print(f"   🔧 Flattening genres struct...")
+            print(f"Flattening genres struct...")
             df = flatten_genres(df)
         else:
             df = clean_col_names(df)
@@ -225,8 +217,8 @@ def bronze_ingest(name, raw_path, bronze_path):
         )
 
         # Mark all files as seen in checkpoint
-        # WHY: Prevents re-processing on next incremental run
-        print(f"   📌 Initialising checkpoint...")
+        #  Prevents re-processing on next incremental run
+        print(f"    Initialising checkpoint...")
         (
             spark.readStream
             .format("cloudFiles")
@@ -247,7 +239,7 @@ def bronze_ingest(name, raw_path, bronze_path):
     count = spark.read.format("delta").load(bronze_path).count()
     return count
 
-# ── RUN ALL DATASETS ──────────────────────────────────────────
+# ─ RUN ALL DATASETS ─
 print("=" * 55)
 print("BRONZE INGESTION — REAL GOODREADS DATA")
 print("=" * 55)
@@ -265,23 +257,23 @@ ingestion_plan = [
 
 results = {}
 for name, raw, bronze in ingestion_plan:
-    print(f"\n📥 {name.upper()}")
+    print(f"\n {name.upper()}")
     try:
         count = bronze_ingest(name, raw, bronze)
         results[name] = count
-        print(f"   ✅ {count:,} records")
+        print(f" {count:,} records")
     except Exception as e:
-        print(f"   ❌ Failed: {e}")
+        print(f" Failed: {e}")
         results[name] = 0
 
 # ── QUALITY CHECKS ────────────────────────────────────────────
 print("\n🔍 Quality Checks:")
 for name, count in results.items():
-    status = "✅" if count > 100 else "❌"
+    status = "SUCCES" if count > 100 else "FASILURE"
     print(f"   {status} {name:10} {count:,} records")
 
 print("\n" + "=" * 55)
-print("✅ BRONZE COMPLETE")
+print("BRONZE COMPLETE")
 print("=" * 55)
 print("""
 INGESTION BEHAVIOUR:
@@ -294,12 +286,10 @@ SCALING:
    300GB → 8-node autoscale, ~45 min, zero code changes
 """)
 
-# COMMAND ----------
 
 # ============================================================
 # CELL 05 — SILVER TRANSFORMATION
 #
-# WHY Silver exists:
 # Bronze = raw truth, never modified.
 # Silver = trusted truth, analysts query this.
 # Bugs in transformation never corrupt source data.
@@ -307,19 +297,16 @@ SCALING:
 #
 # KEY DESIGN DECISIONS:
 #
-# WHY join books with genres table:
 # GoodReads stores genre data separately from book metadata.
 # books.genres field is NULL for most records.
 # The genres Bronze table has book_id → genre mapping.
 # We join at Silver to enrich book records.
 #
-# WHY use popular_shelves as genre fallback:
 # popular_shelves contains reader-assigned shelf names
 # which are the best proxy for genre in GoodReads.
 # Most shelves are genre names: "fiction", "fantasy" etc.
 # We use the most popular shelf as primary genre.
 #
-# WHY SHA256 for user_id:
 # GDPR Article 25 — Privacy by Design.
 # Hash at Silver — no raw PII ever reaches Gold.
 # ============================================================
@@ -328,18 +315,18 @@ print("=" * 55)
 print("SILVER TRANSFORMATION — REAL GOODREADS DATA")
 print("=" * 55)
 
-# ── LOAD BRONZE TABLES ────────────────────────────────────────
+#LOAD BRONZE TABLES
 bronze_books  = spark.read.format("delta").load(f"{BRONZE_PATH}books/")
 bronze_genres = spark.read.format("delta").load(f"{BRONZE_PATH}genres/")
 
-print(f"\n📚 Bronze books  : {bronze_books.count():,}")
-print(f"📚 Bronze genres : {bronze_genres.count():,}")
+print(f"\n Bronze books  : {bronze_books.count():,}")
+print(f" Bronze genres : {bronze_genres.count():,}")
 
-# ── CHECK GENRES TABLE STRUCTURE ──────────────────────────────
-print("\n📋 Genres table columns:")
+# CHECK GENRES TABLE STRUCTURE 
+print("\n Genres table columns:")
 print([c for c in bronze_genres.columns if not c.startswith('_')])
 
-# ── BUILD GENRE LOOKUP ────────────────────────────────────────
+# BUILD GENRE LOOKUP 
 # The genres table has book_id + one column per genre
 # with counts. We find the genre with highest count per book.
 genre_cols = [
@@ -379,10 +366,10 @@ primary_genre = (
     )
 )
 
-print(f"\n📊 Books with genre data: {primary_genre.count():,}")
+print(f"\n Books with genre data: {primary_genre.count():,}")
 
-# ── SILVER BOOKS ──────────────────────────────────────────────
-print("\n🔄 Building Silver Books...")
+# SILVER BOOKS 
+print("\n Building Silver Books...")
 
 silver_books = (
     bronze_books
@@ -410,7 +397,7 @@ silver_books = (
     )
 
     # Popular shelves as genre fallback
-    # WHY: Most books have NULL genres field
+    # Most books have NULL genres field
     # popular_shelves has reader-assigned shelf names
     # which are the best genre proxy available
     .withColumn("shelf_genre",
@@ -476,23 +463,23 @@ silver_count = spark.read.format("delta").load(
     f"{SILVER_PATH}books/"
 ).count()
 
-print(f"   ✅ Silver Books: {silver_count:,} records")
+print(f"Silver Books: {silver_count:,} records")
 
 # Quality checks
 null_check = silver_books.filter(
     F.col("book_id").isNull() |
     F.col("average_rating").isNull()
 ).count()
-print(f"   ✅ Null check  : {null_check} nulls on critical columns")
+print(f"Null check  : {null_check} nulls on critical columns")
 
 # Genre coverage
 genre_coverage = silver_books.filter(
     F.col("primary_genre") != "Uncategorised"
 ).count()
-print(f"   ✅ Genre coverage: {genre_coverage:,} books have genre")
+print(f"Genre coverage: {genre_coverage:,} books have genre")
 
 # Quality distribution
-print("\n📊 Data quality distribution:")
+print("\n Data quality distribution:")
 spark.read.format("delta").load(f"{SILVER_PATH}books/") \
     .groupBy("data_quality_flag") \
     .count() \
@@ -500,7 +487,7 @@ spark.read.format("delta").load(f"{SILVER_PATH}books/") \
     .show()
 
 # Genre distribution
-print("📊 Top genres:")
+print("Top genres:")
 spark.read.format("delta").load(f"{SILVER_PATH}books/") \
     .filter(F.col("data_quality_flag").isin(
         "high_confidence", "medium_confidence"
@@ -511,10 +498,9 @@ spark.read.format("delta").load(f"{SILVER_PATH}books/") \
     .show(10)
 
 print("=" * 55)
-print("✅ SILVER COMPLETE")
+print("SILVER COMPLETE")
 print("=" * 55)
 
-# COMMAND ----------
 
 # ============================================================
 # CELL 06 — GOLD LAYER
@@ -565,7 +551,7 @@ silver_books = spark.read.format("delta").load(
     f"{SILVER_PATH}books/"
 )
 
-# ── AUDIOBOOK CANDIDATES ──────────────────────────────────────
+# AUDIOBOOK CANDIDATES 
 gold_candidates = (
     silver_books
     .filter(F.col("data_quality_flag").isin(
@@ -619,7 +605,7 @@ gold_candidates = (
     .save(f"{GOLD_PATH}audiobook_candidates/")
 )
 
-# ── GENRE PERFORMANCE ─────────────────────────────────────────
+# GENRE PERFORMANCE 
 genre_summary = (
     silver_books
     .filter(F.col("data_quality_flag").isin(
@@ -658,14 +644,14 @@ genre_summary = (
     .save(f"{GOLD_PATH}genre_summary/")
 )
 
-# ── RESULTS ───────────────────────────────────────────────────
+# RESULTS 
 total = spark.read.format("delta").load(
     f"{GOLD_PATH}audiobook_candidates/"
 ).count()
 
-print(f"✅ Gold candidates: {total:,} books scored and ranked")
+print(f"Gold candidates: {total:,} books scored and ranked")
 
-print("\n🏆 TOP 10 AUDIOBOOK CANDIDATES:")
+print("\nTOP 10 AUDIOBOOK CANDIDATES:")
 spark.read.format("delta").load(
     f"{GOLD_PATH}audiobook_candidates/"
 ).select(
@@ -681,7 +667,7 @@ spark.read.format("delta").load(
     "avg_rating", "total_ratings", "avg_weighted_score"
 ).show(truncate=False)
 
-print("\n🥇 BEST BOOK PER GENRE:")
+print("\nBEST BOOK PER GENRE:")
 spark.sql(f"""
     SELECT genre_rank, primary_genre, title,
            average_rating, weighted_score
@@ -697,7 +683,7 @@ spark.sql(f"""
     ORDER BY weighted_score DESC
 """).show(truncate=False)
 
-# ── BUSINESS ANSWER ───────────────────────────────────────────
+# BUSINESS ANSWER 
 top = spark.read.format("delta").load(
     f"{GOLD_PATH}audiobook_candidates/"
 ).orderBy("audiobook_rank").first()
@@ -730,7 +716,6 @@ RECOMMENDATION:
 """)
 print("=" * 55)
 
-# COMMAND ----------
 
 # ============================================================
 # REGISTER TABLES IN UNITY CATALOG
@@ -761,13 +746,12 @@ for table, path in tables.items():
         count = spark.sql(
             f"SELECT COUNT(*) as c FROM `{CATALOG}`.bookworm.{table}"
         ).first()['c']
-        print(f"   ✅ {table:35} {count:,} rows")
+        print(f"   {table:35} {count:,} rows")
     except Exception as e:
-        print(f"   ❌ {table}: {e}")
+        print(f" {table}: {e}")
 
-print("\n✅ ALL TABLES REGISTERED IN UNITY CATALOG")
+print("\nALL TABLES REGISTERED IN UNITY CATALOG")
 
-# COMMAND ----------
 
 # ============================================================
 # CELL 08 — FINAL BUSINESS QUERIES
@@ -780,7 +764,7 @@ print("BUSINESS QUERIES — REAL GOODREADS DATA")
 print("=" * 55)
 
 # ── QUERY 1: TOP 10 AUDIOBOOK CANDIDATES ─────────────────────
-print("\n🏆 TOP 10 AUDIOBOOK CANDIDATES:")
+print("\n TOP 10 AUDIOBOOK CANDIDATES:")
 print("Business Question: Which titles to prioritise?")
 spark.sql(f"""
     SELECT
@@ -797,7 +781,7 @@ spark.sql(f"""
 """).show(truncate=False)
 
 # ── QUERY 2: BEST BOOK PER GENRE ─────────────────────────────
-print("\n🥇 BEST BOOK PER GENRE:")
+print("\n BEST BOOK PER GENRE:")
 print("Business Question: One title per genre to start with?")
 spark.sql(f"""
     SELECT
@@ -819,7 +803,7 @@ spark.sql(f"""
 """).show(truncate=False)
 
 # ── QUERY 3: GENRE STRATEGY ───────────────────────────────────
-print("\n📚 GENRE STRATEGY:")
+print("\n GENRE STRATEGY:")
 print("Business Question: Which genres to focus on?")
 spark.sql(f"""
     SELECT
@@ -835,13 +819,13 @@ spark.sql(f"""
 """).show(truncate=False)
 
 # ── QUERY 4: DELTA TIME TRAVEL ────────────────────────────────
-print("\n⏰ DELTA TIME TRAVEL — Full audit capability:")
+print("\n DELTA TIME TRAVEL — Full audit capability:")
 spark.sql(f"""
     DESCRIBE HISTORY delta.`{GOLD_PATH}audiobook_candidates/`
 """).select("version", "timestamp", "operation").show(5)
 
 # ── QUERY 5: DATA QUALITY SUMMARY ────────────────────────────
-print("\n🔍 DATA QUALITY SUMMARY:")
+print("\n DATA QUALITY SUMMARY:")
 print("End-to-end data quality across all layers:")
 spark.sql(f"""
     SELECT
@@ -866,7 +850,7 @@ spark.sql(f"""
 
 # ── FINAL SUMMARY ─────────────────────────────────────────────
 print("\n" + "=" * 55)
-print("💡 FINAL BUSINESS RECOMMENDATION")
+print(" FINAL BUSINESS RECOMMENDATION")
 print("=" * 55)
 print(f"""
 PLATFORM STATUS:
@@ -897,5 +881,5 @@ PRODUCTION ADDITIONS:
    Unity Catalog row-level security per persona
 """)
 print("=" * 55)
-print("✅ BOOKWORM PLATFORM — FULLY OPERATIONAL ON REAL DATA")
+print("BOOKWORM PLATFORM — FULLY OPERATIONAL ON REAL DATA")
 print("=" * 55)
