@@ -40,7 +40,7 @@ jobs:
                 http_path: ${{ secrets.DATABRICKS_HTTP_PATH }}
                 token: ${{ secrets.DATABRICKS_TOKEN }}
                 catalog: piagroup_assessment_bookworm
-                schema: bookworm_ci
+                schema: bookworm
                 threads: 4
           EOF
 
