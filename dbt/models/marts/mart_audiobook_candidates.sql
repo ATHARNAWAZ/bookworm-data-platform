@@ -5,28 +5,34 @@
   Consumer : Power BI, Databricks Dashboard, Product Managers
 
   Business Purpose:
-  Primary business output. Ranks 11,124 statistically
-  reliable books by audiobook potential.
+  Primary business output. Ranks books by audiobook potential.
 
   Scoring Formula:
-  weighted_score = (rating    × 40%)
-                 + (popularity × 30%)
-                 + (sentiment  × 30%)
+  weighted_score = (rating     × 35%)
+                 + (popularity  × 25%)
+                 + (sentiment   × 25%)
+                 + (length      × 15%)
 
-  WHY these weights:
-  Rating (40%): Quality is primary signal.
+  WHY four components:
+  Rating (35%): Quality is primary signal.
   A bad book makes a bad audiobook regardless of popularity.
 
-  Popularity (30%): Market validation reduces investment risk.
-  LOG scale — LN(5M) vs LN(500K) is reasonable not 10x.
+  Popularity (25%): Market validation reduces investment risk.
+  LOG scale — prevents mega-popular books dominating.
 
-  Sentiment (30%): Forward-looking reader enthusiasm.
-  Currently rating-based proxy. Production uses Spark NLP
-  on review text for audiobook-specific sentiment signals.
+  Sentiment (25%): Forward-looking reader enthusiasm.
+  Currently rating-based proxy. Production: Spark NLP on
+  review text for audiobook-specific sentiment signals
+  like narrator quality and listening experience.
 
-  WHY parameterised via dbt vars:
-  Business can change weights without touching SQL.
-  Three named strategies in dbt_project.yml vars.
+  Length (15%): Audiobook production economics.
+  200-400 pages = ideal 6-12 hour audiobook.
+  800+ pages = 40+ hour production = high cost high risk.
+  NULL pages = neutral score — data not available.
+
+  WHY parameterised:
+  All four weights adjustable in dbt_project.yml.
+  Business can shift strategy without touching SQL.
 */
 
 WITH enriched AS (
@@ -40,11 +46,36 @@ scored AS (
         LN(5000001)                             AS max_log_ratings,
 
         -- Sentiment proxy — rating heuristic
+        -- Production: replace with Spark NLP on review text
         CASE
             WHEN average_rating >= 4.0 THEN 1.0
             WHEN average_rating >= 3.0 THEN 0.5
             ELSE 0.0
-        END                                     AS sentiment_score
+        END                                     AS sentiment_score,
+
+        -- WHY length score:
+        -- Audiobook production cost scales with length.
+        -- A 1200 page book = 40+ hour recording = high risk.
+        -- 200-400 pages = ideal 6-12 hour audiobook.
+        -- NULL num_pages gets neutral 0.5 score.
+        CASE
+            WHEN num_pages IS NULL          THEN 0.5
+            WHEN num_pages BETWEEN 200 AND 400 THEN 1.0
+            WHEN num_pages BETWEEN 400 AND 600 THEN 0.8
+            WHEN num_pages BETWEEN 100 AND 200 THEN 0.6
+            WHEN num_pages BETWEEN 600 AND 800 THEN 0.4
+            ELSE 0.2
+        END                                     AS length_score,
+
+        -- Length category for analyst readability
+        CASE
+            WHEN num_pages IS NULL             THEN 'unknown'
+            WHEN num_pages BETWEEN 200 AND 400 THEN 'ideal'
+            WHEN num_pages BETWEEN 400 AND 600 THEN 'good'
+            WHEN num_pages BETWEEN 100 AND 200 THEN 'short'
+            WHEN num_pages BETWEEN 600 AND 800 THEN 'long'
+            ELSE 'very_long'
+        END                                     AS length_category
 
     FROM enriched
     WHERE data_quality_flag IN (
@@ -64,7 +95,9 @@ weighted AS (
             (log_ratings / max_log_ratings
                 * {{ var('popularity_weight') }}) +
             (sentiment_score
-                * {{ var('sentiment_weight') }}),
+                * {{ var('sentiment_weight') }}) +
+            (length_score
+                * {{ var('length_weight') }}),
         4)                                      AS weighted_score
     FROM scored
 ),
@@ -87,12 +120,12 @@ SELECT
     genre_rank,
     book_id,
     title,
-    --title_without_series,
     primary_author_id,
     primary_genre,
     average_rating,
     ratings_count,
-    text_reviews_count,
+    COALESCE(num_pages, 0)                      AS num_pages,
+    length_category,
     total_reviews,
     positive_review_pct,
     negative_review_pct,
@@ -103,6 +136,8 @@ SELECT
         * {{ var('popularity_weight') }}, 4)    AS popularity_contribution,
     ROUND(sentiment_score
         * {{ var('sentiment_weight') }}, 4)     AS sentiment_contribution,
+    ROUND(length_score
+        * {{ var('length_weight') }}, 4)        AS length_contribution,
     data_quality_flag,
     _enriched_timestamp
 FROM ranked

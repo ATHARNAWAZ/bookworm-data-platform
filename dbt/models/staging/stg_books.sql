@@ -44,7 +44,7 @@ cleaned AS (
         CAST(average_rating AS DOUBLE)              AS average_rating,
         CAST(ratings_count AS BIGINT)               AS ratings_count,
         CAST(text_reviews_count AS BIGINT)          AS text_reviews_count,
-
+        CAST(num_pages AS INTEGER)              AS num_pages,
         description,
 
         -- WHY: Extract primary genre from array

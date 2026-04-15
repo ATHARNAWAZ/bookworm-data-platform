@@ -51,6 +51,7 @@ enriched AS (
         b.average_rating,
         b.ratings_count,
         b.text_reviews_count,
+        b.num_pages,
         b.primary_genre,
         b.description,
         b.data_quality_flag,
