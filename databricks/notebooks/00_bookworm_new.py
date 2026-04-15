@@ -26,7 +26,7 @@ from datetime import datetime
 import re
 
 STORAGE_ACCOUNT  = "bookwormadls"
-STORAGE_KEY      = "RPILeVtSEo4a1cjIC1n3z9y+geXugV73FpBeyXZ2seGZS2HvYFoiJ8ZmZ0XC8T/sXPGKhqA7qdJP+AStR3vXyw=="
+STORAGE_KEY      = "YOUR_KEY_HERE"
 
 spark.conf.set(
     f"fs.azure.account.key.{STORAGE_ACCOUNT}.dfs.core.windows.net",
