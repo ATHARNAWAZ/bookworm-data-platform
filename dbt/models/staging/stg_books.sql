@@ -24,9 +24,9 @@ deduplicated AS (
     SELECT
         *,
         ROW_NUMBER() OVER (
-            PARTITION BY book_id
-            ORDER BY _ingestion_timestamp DESC
-        ) AS rn
+    PARTITION BY book_id
+    ORDER BY CAST(ratings_count AS BIGINT) DESC
+) AS rn
     FROM source
     WHERE book_id IS NOT NULL
 ),

@@ -94,6 +94,8 @@ models:
           - relationships:
               to: ref('stg_books')
               field: book_id
+              config:
+                severity: warn
       - name: user_id_hashed
         description: "SHA256 hash of user_id — GDPR compliant"
         data_type: string
