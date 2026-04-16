@@ -3,41 +3,120 @@ version: 2
 models:
   - name: mart_audiobook_candidates
     description: >
-      Primary business output. Ranked audiobook candidates
-      scored by weighted formula combining rating quality,
-      popularity, and reader sentiment.
+      Primary business output. 10,670 books ranked by audiobook potential.
+      Scoring: rating 35% + popularity 25% + sentiment 25% + length 15%.
+      All weights parameterised in dbt_project.yml.
+    config:
+      contract:
+        enforced: true
     columns:
       - name: audiobook_rank
-        description: "Overall rank — 1 is best candidate"
-        tests:
-          - not_null
+        description: "Overall rank by weighted score"
+        data_type: integer
+        tests: [not_null]
+      - name: genre_rank
+        description: "Rank within genre"
+        data_type: integer
       - name: book_id
         description: "Unique book identifier"
-        tests:
-          - not_null
-          - unique
-      - name: weighted_score
-        description: "Composite score 0 to 1"
-        tests:
-          - not_null
+        data_type: string
+        tests: [not_null, unique]
+      - name: title
+        description: "Book title"
+        data_type: string
+        tests: [not_null]
+      - name: primary_author_id
+        description: "Primary author GoodReads ID"
+        data_type: string
       - name: primary_genre
+        description: "Primary genre classification"
+        data_type: string
+        tests: [not_null]
+      - name: average_rating
+        description: "Average reader rating 0-5"
+        data_type: double
+      - name: ratings_count
+        description: "Total number of ratings"
+        data_type: bigint
+      - name: num_pages
+        description: "Number of pages"
+        data_type: integer
+      - name: length_category
+        description: "Audiobook length classification"
+        data_type: string
         tests:
-          - not_null
+          - accepted_values:
+              values: [ideal, good, short, long, very_long, unknown]
+      - name: total_reviews
+        description: "Total review count from real readers"
+        data_type: bigint
+      - name: positive_review_pct
+        description: "Percentage of positive reviews"
+        data_type: decimal
+      - name: negative_review_pct
+        description: "Percentage of negative reviews"
+        data_type: decimal
+      - name: weighted_score
+        description: "Composite audiobook suitability score 0-1"
+        data_type: double
+        tests: [not_null]
+      - name: rating_contribution
+        description: "Rating component of weighted score"
+        data_type: double
+      - name: popularity_contribution
+        description: "Popularity component of weighted score"
+        data_type: double
+      - name: sentiment_contribution
+        description: "Sentiment component of weighted score"
+        data_type: decimal
+      - name: length_contribution
+        description: "Length component of weighted score"
+        data_type: decimal
+      - name: data_quality_flag
+        description: "Confidence level based on ratings count"
+        data_type: string
+      - name: _enriched_timestamp
+        description: "When source record was enriched"
+        data_type: timestamp
 
   - name: mart_genre_performance
-    description: "Genre-level aggregation for portfolio strategy"
+    description: >
+      Genre-level aggregation for portfolio strategy.
+      Answers which genres to focus the audiobook programme on.
+    config:
+      contract:
+        enforced: true
     columns:
-      - name: genre
-        tests:
-          - not_null
-          - unique
       - name: genre_rank
-        tests:
-          - not_null
-
-  - name: mart_author_performance
-    description: "Author performance for partnership decisions"
-    columns:
-      - name: author_rank
-        tests:
-          - not_null
+        description: "Genre rank by average weighted score"
+        data_type: integer
+        tests: [not_null]
+      - name: genre
+        description: "Genre name"
+        data_type: string
+        tests: [not_null, unique]
+      - name: avg_weighted_score
+        description: "Average weighted score across all books in genre"
+        data_type: double
+        tests: [not_null]
+      - name: total_books
+        description: "Number of books in this genre"
+        data_type: bigint
+        tests: [not_null]
+      - name: avg_rating
+        description: "Average rating across genre"
+        data_type: double
+        tests: [not_null]
+      - name: total_ratings
+        description: "Total ratings across genre"
+        data_type: bigint
+        tests: [not_null]
+      - name: avg_positive_pct
+        description: "Average positive review percentage"
+        data_type: decimal
+      - name: avg_negative_pct
+        description: "Average negative review percentage"
+        data_type: decimal
+      - name: _mart_timestamp
+        description: "When this mart was last built"
+        data_type: timestamp

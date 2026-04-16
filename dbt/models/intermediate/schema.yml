@@ -1,0 +1,21 @@
+version: 2
+
+models:
+  - name: int_books_enriched
+    description: >
+      Single enriched book entity joining metadata, genre and
+      real sentiment metrics from 15.7M reader reviews.
+      All Gold marts build from this model — no re-joining needed.
+    columns:
+      - name: book_id
+        tests: [not_null, unique]
+      - name: title
+        tests: [not_null]
+      - name: average_rating
+        tests: [not_null]
+      - name: primary_genre
+        tests: [not_null]
+      - name: data_quality_flag
+        tests:
+          - accepted_values:
+              values: [high_confidence, medium_confidence, low_confidence]

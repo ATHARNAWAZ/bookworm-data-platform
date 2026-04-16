@@ -1,0 +1,45 @@
+version: 2
+
+sources:
+  - name: bronze
+    catalog: piagroup_assessment_bookworm
+    schema: bookworm
+    description: >
+      Raw GoodReads data ingested via Auto Loader into Bronze Delta tables.
+      Immutable — never modified after ingestion.
+
+    tables:
+      - name: bronze_books
+        description: "2.36M raw GoodReads book records"
+        columns:
+          - name: book_id
+            description: "Unique GoodReads book identifier"
+            tests: [not_null]
+          - name: title
+            description: "Book title"
+            tests: [not_null]
+          - name: average_rating
+            description: "Average reader rating stored as string"
+            tests: [not_null]
+          - name: ratings_count
+            description: "Total number of ratings stored as string"
+
+      - name: bronze_reviews
+        description: "15.7M raw GoodReads reader reviews"
+        columns:
+          - name: review_id
+            description: "Unique review identifier"
+            tests: [not_null]
+          - name: book_id
+            description: "Foreign key to bronze_books"
+            tests: [not_null]
+          - name: rating
+            description: "Star rating 1-5 stored as long"
+            tests: [not_null]
+
+      - name: bronze_genres
+        description: "Genre classification per book — one column per genre"
+        columns:
+          - name: book_id
+            description: "Foreign key to bronze_books"
+            tests: [not_null]
