@@ -1,117 +1,168 @@
 # BookWorm Data Platform
 
 **Senior Data Engineer Assignment — PIA Group**
-Built by: Ather Nawaz
-Stack: Azure ADLS Gen2 · Databricks · Delta Lake · dbt · Unity Catalog · Power BI
+
+A production-grade data platform built on Azure Databricks, dbt, Delta Lake and Unity Catalog.
+Analyses 2.3 million real GoodReads books and 15.7 million reader reviews to identify
+the highest-potential audiobook candidates for BookWorm Publishing.
 
 ---
 
-## Business Problem
+## Business Answer
 
-BookWorm Publishing is launching a new audiobook series and needs data-driven decisions about which titles to prioritise. This platform analyses the complete GoodReads dataset to identify the highest-potential audiobook candidates based on reader sentiment, ratings, and popularity.
+> **Top audiobook candidate: Harry Potter and the Sorcerer's Stone**
+> Score: 0.9367 | Rating: 4.45 | Pages: 320 (ideal) | 4.7M ratings | Genre: Fantasy/Paranormal
 
-**The Question:** Which books should BookWorm turn into audiobooks first?
-
-**The Answer:** A weighted scoring model combining rating quality (40%), reader popularity (30%), and positive sentiment (30%) — fully parameterised and adjustable by the business.
-
+| Rank | Title | Genre | Score | Pages |
+|------|-------|-------|-------|-------|
+| 1 | Harry Potter and the Sorcerer's Stone | fantasy_paranormal | 0.9367 | 320 ideal |
+| 2 | The Hunger Games | young-adult | 0.9223 | 374 ideal |
+| 3 | To Kill a Mockingbird | fiction | 0.9151 | 324 ideal |
+| 4 | Harry Potter and the Chamber of Secrets | fantasy_paranormal | 0.9115 | 341 ideal |
+| 5 | Harry Potter and the Prisoner of Azkaban | fiction | 0.9075 | 435 good |
 
 ---
 
-## 📊 Live Dashboard
+## Live Dashboard
 
-**[Click here to view the BookWorm Audiobook Intelligence Dashboard →](https://adb-7405608220287115.15.azuredatabricks.net/dashboardsv3/01f1382f39881c339c2f7e69ee559dcf/published?o=7405608220287115)**
+[BookWorm Audiobook Intelligence Dashboard](https://adb-7405608220287115.15.azuredatabricks.net/dashboardsv3/01f1382f39881c339c2f7e69ee559dcf/published?o=7405608220287115)
 
-Built on real GoodReads data — 2.3 million books, 11,124 ranked candidates.
+5 interactive charts built on real GoodReads data:
+- Top 10 audiobook candidates ranked by weighted score
+- Genre performance for portfolio strategy
+- Score breakdown showing what drives each ranking
+- Data quality distribution across 2.3M books
+- Best book per genre for editorial decisions
 
-### Dashboard Charts
+---
 
-**Chart 1 — Top 10 Audiobook Candidates**
-Ranked by weighted score combining rating quality, popularity and sentiment.
-Harry Potter and the Sorcerer's Stone leads with score 0.9551 and 4.7M ratings.
+## Two Pipeline Implementations
 
-**Chart 2 — Genre Performance**
-Fantasy/Paranormal and Fiction dominate with highest average scores.
-Poetry and Children perform surprisingly well due to high rating consistency.
+This platform was implemented in two ways to demonstrate different approaches
+to the same problem. Both produce identical business results.
 
-**Chart 3 — Score Breakdown**
-Stacked bar showing rating, popularity and sentiment contribution per title.
-Transparency into WHY each book ranks where it does.
+### Implementation A — Full PySpark Pipeline (Databricks Notebook)
 
-**Chart 4 — Data Quality Distribution**
-2.35M books filtered as low confidence — only 11,124 books with proven
-market validation (10K+ ratings) reach the Gold scoring layer.
+    databricks/notebooks/01_bookworm_pipeline.py
 
-**Chart 5 — Best Book Per Genre**
-One actionable recommendation per genre for BookWorm's editorial team.
+The complete end-to-end pipeline in a single Databricks notebook.
+Databricks handles Bronze ingestion, Silver transformation and Gold scoring.
+All logic is in PySpark — fast to develop, easy to run interactively,
+familiar to any Spark engineer.
 
+    RAW → Bronze (Auto Loader) → Silver (PySpark) → Gold (PySpark) → Unity Catalog
+
+When to use this approach: small teams, rapid prototyping, when analysts
+do not need to contribute to transformation logic.
+
+### Implementation B — Clean Separation (Databricks + dbt)
+
+    databricks/notebooks/01_bookworm_pipeline.py  ← Bronze ingestion only
+    dbt/models/                                   ← Silver and Gold
+
+The Databricks notebook does one thing only — Bronze ingestion.
+dbt owns all transformation from Silver onwards — version-controlled SQL,
+automated testing, dbt contracts, lineage graph.
+
+    RAW → Bronze (Databricks Auto Loader)
+              → Silver (dbt staging + intermediate)
+                    → Gold (dbt marts)
+
+When to use this approach: larger teams, when analysts contribute to
+transformation logic, when data contracts and automated testing are required.
+This is the recommended production pattern for PIA Group.
+
+### Why Both Exist
+
+The full PySpark notebook was built first to explore the real GoodReads schema
+interactively. Once the schema was understood, the dbt models were built with
+that knowledge — correct first time. This mirrors the correct professional
+workflow: explore in a notebook, formalise in dbt.
 
 ---
 
 ## Architecture
 
 ```
-GoodReads Dataset (Real Data)
-├── goodreads_books.json.gz          2.36GB — book metadata
-├── goodreads_reviews_dedup.json.gz  9GB    — 15M reader reviews
-├── goodreads_book_authors.json.gz   50MB   — author metadata
-├── goodreads_book_series.json.gz    30MB   — series metadata
-└── goodreads_book_genres.json.gz    10MB   — genre taxonomy
+RAW (ADLS Gen2)
+    goodreads/books/      1.94GB compressed JSON
+    goodreads/reviews/    5.1GB compressed JSON
+    goodreads/authors/    17MB
+    goodreads/genres/     23MB
+    goodreads/series/     27MB
           |
-          | Auto Loader
-          | Incremental, idempotent, exactly-once
-          | Schema evolution handled automatically
+          | Databricks Auto Loader
+          | Bootstrap + incremental pattern
+          | Exactly-once via checkpointing
           v
-+-------------------------------------------------+
-|  BRONZE  |  Azure ADLS Gen2 + Delta Lake        |
-|          |  Raw data preserved exactly           |
-|          |  Full audit trail + metadata          |
-|          |  Append-only, immutable               |
-+-------------------------------------------------+
+BRONZE (Delta Lake)
+    bronze_books          2,360,668 records
+    bronze_reviews        15,739,967 records
+    bronze_authors        829,529 records
+    bronze_genres         2,360,655 records
+    bronze_series         400,390 records
           |
-          | dbt-databricks
-          | Version-controlled SQL models
-          | Built-in tests on every model
+          |------------------------------------
+          |                                  |
+          | Implementation A                 | Implementation B
+          | PySpark in notebook              | dbt SQL models
+          |                                  |
+          v                                  v
+SILVER                                   SILVER (dbt)
+  PySpark Silver transformation            stg_books
+  Genre join                               stg_reviews
+  Sentiment aggregation                    stg_genres
+  SHA256 PII hashing                       int_books_enriched
+          |                                  |
+          v                                  v
+GOLD                                     GOLD (dbt)
+  PySpark Gold scoring                     mart_audiobook_candidates
+  4-component weighted score               mart_genre_performance
+  Audiobook ranking                        dbt contracts enforced
+          |------------------------------------
+          |
           v
-+-------------------------------------------------+
-|  SILVER  |  dbt Staging + Intermediate          |
-|          |  stg_books, stg_reviews              |
-|          |  stg_authors, stg_series, stg_genres |
-|          |  int_books_enriched (joined)          |
-|          |  dbt tests: not_null, unique          |
-|          |  relationships, accepted_values       |
-+-------------------------------------------------+
+UNITY CATALOG
+    6 tables registered and governed
+    Role-based access control
+    Audit logging via system tables
           |
-          | dbt Mart models
-          | Business logic + weighted scoring
-          | Parameterised via dbt vars
           v
-+-------------------------------------------------+
-|  GOLD    |  dbt Mart models                     |
-|          |  mart_audiobook_candidates            |
-|          |  mart_genre_performance               |
-|          |  mart_author_performance              |
-|          |  mart_series_potential                |
-+-------------------------------------------------+
-          |
-     +---------+------------------+
-     |                           |
-     v                           v
-+----------+          +--------------------+
-| Power BI |          | Databricks SQL     |
-| Reports  |          | Live Dashboard     |
-+----------+          +--------------------+
-
-GOVERNANCE: Unity Catalog (piagroup_assessment_bookworm)
-- Role: data_analyst    -> Gold marts only
-- Role: data_scientist  -> Silver + Gold
-- Role: product_manager -> Gold aggregated views only
-- Column masking on user_id (SHA256 — GDPR compliant)
-
-CI/CD: GitHub Actions
-- dbt test on every pull request
-- dbt docs generate on merge to main
-- Databricks job trigger on release
+DASHBOARD
+    5 live Databricks SQL charts
 ```
+
+---
+
+## Scoring Formula
+
+    weighted_score = (rating     x 35%)
+                   + (popularity  x 25%)
+                   + (sentiment   x 25%)
+                   + (length      x 15%)
+
+| Component | Weight | Logic | Why |
+|-----------|--------|-------|-----|
+| Rating | 35% | average_rating / 5.0 | Quality is primary — a bad book makes a bad audiobook |
+| Popularity | 25% | LN(ratings_count) / LN(5M) | Log scale prevents mega-popular books dominating |
+| Sentiment | 25% | positive_review_pct from 15.7M real reviews | Actual reader enthusiasm |
+| Length | 15% | 200-400 pages = 1.0, 800+ pages = 0.2 | Production economics — 800+ pages = 40hr recording |
+
+All weights parameterised in dbt/dbt_project.yml. Change three numbers and run dbt run.
+
+---
+
+## Stack
+
+| Layer | Technology | Why |
+|-------|-----------|-----|
+| Storage | Azure ADLS Gen2 North Europe | GDPR data residency |
+| Compute | Azure Databricks | Native Delta Lake + Auto Loader + Unity Catalog |
+| Table format | Delta Lake | ACID transactions, time travel, schema evolution |
+| Transformation | dbt-databricks 1.10.19 | Version-controlled SQL, testing, data contracts |
+| Governance | Unity Catalog | Centralised access control |
+| CI/CD | GitHub Actions | dbt compile on every commit |
+| Dashboard | Databricks SQL | Live charts on Unity Catalog tables |
 
 ---
 
@@ -119,226 +170,111 @@ CI/CD: GitHub Actions
 
 ```
 bookworm-data-platform/
-|
-├── README.md
-|
 ├── databricks/
-│   ├── notebooks/
-│   │   ├── 01_bronze_ingestion.py     Auto Loader pipeline
-│   │   └── 02_run_dbt_models.py       dbt execution in Databricks
-│   └── workflows/
-│       └── bookworm_pipeline.json     Databricks Workflow config
-|
+│   └── notebooks/
+│       └── 01_bookworm_pipeline.py   Full PySpark pipeline (Implementation A)
+│                                     Also serves as Bronze-only for Implementation B
 ├── dbt/
-│   ├── dbt_project.yml                dbt project configuration
-│   ├── profiles.yml                   Databricks connection
-│   ├── models/
-│   │   ├── staging/                   Bronze to Silver (1:1 per source)
-│   │   │   ├── stg_books.sql
-│   │   │   ├── stg_reviews.sql
-│   │   │   ├── stg_authors.sql
-│   │   │   ├── stg_series.sql
-│   │   │   ├── stg_genres.sql
-│   │   │   └── schema.yml             Source definitions + tests
-│   │   ├── intermediate/              Enrichment and joining
-│   │   │   └── int_books_enriched.sql
-│   │   └── marts/                     Gold business models
-│   │       ├── mart_audiobook_candidates.sql
-│   │       ├── mart_genre_performance.sql
-│   │       ├── mart_author_performance.sql
-│   │       ├── mart_series_potential.sql
-│   │       └── schema.yml             Model docs + tests
-│   ├── tests/
-│   │   └── assert_positive_ratings.sql
-│   └── macros/
-│       └── generate_schema_name.sql
-|
+│   ├── dbt_project.yml               Weights and thresholds configured here
+│   ├── profiles.yml.example
+│   └── models/
+│       ├── staging/
+│       │   ├── sources.yml           Bronze table definitions
+│       │   ├── stg_books.sql         Clean book metadata
+│       │   ├── stg_reviews.sql       Reviews + SHA256 PII hashing
+│       │   ├── stg_genres.sql        Genre UNPIVOT
+│       │   └── schema.yml            Tests + dbt contracts
+│       ├── intermediate/
+│       │   ├── int_books_enriched.sql Books + genre + sentiment joined
+│       │   └── schema.yml
+│       └── marts/
+│           ├── mart_audiobook_candidates.sql  Gold scoring
+│           ├── mart_genre_performance.sql     Genre strategy
+│           └── schema.yml            Tests + dbt contracts
 ├── docs/
-│   ├── architecture/
-│   │   └── decisions.md               Architecture Decision Records
-│   └── decisions/
-│       └── tradeoff_analysis.md       Full trade-off analysis
-|
+│   ├── architecture.md
+│   └── gdpr_and_compliance.md
 └── .github/
     └── workflows/
-        └── dbt_ci.yml                 CI/CD pipeline
+        └── dbt_ci.yml                GitHub Actions dbt compile on push
 ```
 
 ---
 
-## How To Run
+## How to Run
 
-### Prerequisites
+### Option A — Full PySpark Pipeline
 
-- Databricks workspace on Azure
-- Azure ADLS Gen2 storage account (bookwormadls)
-- Python 3.11+
-- dbt-databricks installed
+Open databricks/notebooks/01_bookworm_pipeline.py in Databricks.
+Add your Azure storage key to Cell 1 and run all 8 cells in order.
+Runtime: approximately 30 minutes on a single node cluster.
 
-```bash
-pip install dbt-databricks
-```
+### Option B — Databricks Bronze + dbt Silver/Gold
 
-### Step 1 — Upload Real Data to ADLS
+Step 1: Run Cells 1-4 in the Databricks notebook (Bronze ingestion only).
 
-Upload all GoodReads files to the raw container:
+Step 2: Run dbt for Silver and Gold transformation.
 
-```
-raw/goodreads/books/    <- goodreads_books.json.gz
-raw/goodreads/reviews/  <- goodreads_reviews_dedup.json.gz
-raw/goodreads/authors/  <- goodreads_book_authors.json.gz
-raw/goodreads/series/   <- goodreads_book_series.json.gz
-raw/goodreads/genres/   <- goodreads_book_genres_initial.json.gz
-```
+    cd dbt
+    cp profiles.yml.example profiles.yml
+    dbt run
+    dbt test
 
-### Step 2 — Run Bronze Ingestion
+Step 3: Register Bronze tables in Unity Catalog (Cell 7 in notebook).
 
-Open `databricks/notebooks/01_bronze_ingestion.py` in your
-Databricks workspace. Update the storage account name and key
-in the configuration cell. Run all cells.
-
-### Step 3 — Configure dbt
-
-```bash
-cp dbt/profiles.yml.example dbt/profiles.yml
-```
-
-Edit profiles.yml with your Databricks connection details:
-- host: your Databricks workspace URL
-- http_path: your SQL warehouse HTTP path
-- token: your Databricks personal access token
-
-### Step 4 — Run dbt Models
-
-```bash
-cd dbt
-dbt deps
-dbt run
-dbt test
-```
-
-### Step 5 — Generate dbt Docs
-
-```bash
-dbt docs generate
-dbt docs serve
-```
-
-Open http://localhost:8080 to browse the full data catalog
-with lineage, column descriptions, and test results.
-
-### Step 6 — Query Results
-
-In Databricks SQL:
-
-```sql
--- Top audiobook recommendations
-SELECT audiobook_rank, title, primary_genre,
-       average_rating, weighted_score
-FROM piagroup_assessment_bookworm.bookworm.mart_audiobook_candidates
-ORDER BY audiobook_rank
-LIMIT 10;
-
--- Genre strategy
-SELECT genre, total_books, avg_rating, avg_weighted_score
-FROM piagroup_assessment_bookworm.bookworm.mart_genre_performance
-ORDER BY genre_rank;
-```
+Step 4: View results in the live dashboard or query Unity Catalog directly.
 
 ---
 
-## Business Answer
+## Data Quality
 
-Based on the GoodReads dataset analysis:
+| Layer | Records | Tests |
+|-------|---------|-------|
+| bronze_books | 2,360,668 | Source tests |
+| bronze_reviews | 15,739,967 | Source tests |
+| stg_books | 2,353,073 | dbt contract enforced |
+| stg_reviews | 15,188,082 | dbt contract enforced |
+| mart_audiobook_candidates | 10,670 | dbt contract enforced |
 
-| Rank | Title | Genre | Score |
-|------|-------|-------|-------|
-| 1 | 1984 | Fiction | 0.972 |
-| 2 | The Hobbit | Fantasy | 0.966 |
-| 3 | Dune | Science Fiction | 0.955 |
-| 4 | Atomic Habits | Non-Fiction | 0.948 |
-
-**Recommendation:** Start with Fiction and Science Fiction.
-Strongest combination of quality, volume, and reader sentiment.
-Both genres have multiple high-scoring titles enabling a
-series-based audiobook strategy for recurring revenue.
+43 dbt tests passing — not_null, unique, relationships, accepted_values, dbt contracts.
 
 ---
 
-## Key Design Decisions
+## GDPR and Compliance
 
-| Decision | Choice | Why |
-|----------|--------|-----|
-| Table format | Delta Lake | ACID transactions, time travel, schema evolution |
-| Transformation | dbt-databricks | SQL-native, version controlled, self-documenting |
-| Ingestion | Auto Loader | Incremental, exactly-once, handles schema changes |
-| Governance | Unity Catalog | Column masking, automatic lineage, audit logs |
-| Architecture | Medallion | Immutable raw, trusted silver, business gold |
-| Batch vs Stream | Batch | BookWorm needs daily reports, not real-time feeds |
+See docs/gdpr_and_compliance.md for full details.
 
-Full analysis: docs/decisions/tradeoff_analysis.md
+- PII hashing: user_id SHA256 hashed in stg_reviews — no raw PII reaches Gold
+- Data residency: All data in Azure North Europe Frankfurt
+- Audit trail: Delta Lake time travel — query any historical state
+- Access control: Unity Catalog role-based access per persona
+- Right to erasure: DELETE + VACUUM procedure documented
 
 ---
 
-## Data Privacy and GDPR
+## Known Limitations
 
-- user_id hashed with SHA256 at Silver layer
-- No raw PII ever reaches Gold or reporting layers
-- Future PII datasets isolated in pii_restricted schema
-- Delta retention policies configurable per table
-- Unity Catalog column masking enforced by role
-- GDPR Article 25 (Privacy by Design) implemented
+Sentiment analysis is rating-based. Production upgrade: Spark NLP on review text.
+See the demonstration cell in the Databricks notebook.
 
----
+genre_non-fiction and genre_young-adult contain hyphens causing UNPIVOT syntax issues.
+These genres fall back to shelf_genre. Production fix: rename at Bronze boundary.
 
-## Scaling: 25GB to 300GB
-
-| Component | Today 25GB | Future 300GB | What Changes |
-|-----------|------------|--------------|--------------|
-| Storage | ADLS Gen2 | ADLS Gen2 | Nothing |
-| Ingestion | Auto Loader | Auto Loader | Nothing |
-| Processing | Single node | 8-node autoscale | Cluster config only |
-| Partitioning | None needed | By genre and date | One ALTER TABLE |
-| Z-ORDER | None needed | On weighted_score | One OPTIMIZE command |
-| Cost | ~8 EUR/month | ~180 EUR/month | Budget alert update |
-
-The architecture was designed for scale from day one.
-No pipeline logic changes at 300GB — only infrastructure config.
+dbt runs locally. Production: dbt Cloud or Databricks Workflows for scheduling.
+GitHub Actions validates SQL on every commit.
 
 ---
 
-## What Production Adds
+## Scoring Strategies
 
-These items are documented design decisions, not implemented in the POC:
-
-- Data contracts at Bronze boundary using Great Expectations
-- Azure Monitor alerting on pipeline failures to Teams
-- dbt Cloud for scheduled runs, team collaboration, hosted docs
-- Power BI semantic layer connected to Gold marts
-- Unity Catalog external locations (requires admin setup)
-- Databricks Asset Bundles for infrastructure as code
-- Row-level security in Unity Catalog per persona
-- Automated data quality SLA monitoring
+| Strategy | rating_weight | popularity_weight | sentiment_weight | length_weight |
+|----------|--------------|-------------------|-----------------|--------------|
+| Default | 0.35 | 0.25 | 0.25 | 0.15 |
+| Conservative | 0.50 | 0.35 | 0.10 | 0.05 |
+| Discovery | 0.60 | 0.10 | 0.25 | 0.05 |
+| Sentiment-first | 0.25 | 0.20 | 0.50 | 0.05 |
 
 ---
 
-## dbt Model Lineage
-
-```
-bronze.books -----> stg_books ----+
-bronze.reviews ---> stg_reviews --+
-bronze.authors ---> stg_authors --+-> int_books_enriched -> mart_audiobook_candidates
-bronze.series ----> stg_series ---+                      -> mart_genre_performance
-bronze.genres ----> stg_genres                           -> mart_author_performance
-                                                         -> mart_series_potential
-```
-
-Each mart answers a distinct business question:
-- mart_audiobook_candidates: Which titles to prioritise?
-- mart_genre_performance: Which genres to focus on?
-- mart_author_performance: Which authors to partner with?
-- mart_series_potential: Which series for recurring revenue?
-
----
-
-Built for PIA Group — Senior Data Engineer Assignment
+Built by Ather Nawaz | Senior Data Engineer
+Stack: Azure ADLS Gen2 · Databricks · Delta Lake · dbt · Unity Catalog
