@@ -43,7 +43,7 @@ to the same problem. Both produce identical business results.
 
 ### Implementation A — Full PySpark Pipeline (Databricks Notebook)
 
-    databricks/notebooks/01_bookworm_pipeline.py
+    databricks/notebooks/01_bookworm_main_final.py
 
 The complete end-to-end pipeline in a single Databricks notebook.
 Databricks handles Bronze ingestion, Silver transformation and Gold scoring.
@@ -57,7 +57,7 @@ do not need to contribute to transformation logic.
 
 ### Implementation B — Clean Separation (Databricks + dbt)
 
-    databricks/notebooks/01_bookworm_pipeline.py  ← Bronze ingestion only
+    databricks/notebooks/01_bookworm_main_final.py  ← Bronze ingestion only
     dbt/models/                                   ← Silver and Gold
 
 The Databricks notebook does one thing only — Bronze ingestion.
