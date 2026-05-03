@@ -1,5 +1,5 @@
 # BookWorm Data Platform
-**Senior Data Engineer Assignment — PIA Group**
+**Senior Data Engineer**
 
 A production-grade data platform built on Azure Databricks, dbt, Delta Lake and Unity Catalog. Analyses 2.3 million real GoodReads books and 15.7 million reader reviews to identify the highest-potential audiobook candidates for BookWorm Publishing.
 
