@@ -4,7 +4,7 @@
 
 BookWorm Data Platform is designed with privacy and compliance as foundational
 requirements — not afterthoughts. This document covers the compliance architecture
-relevant to PIA Group's finance and accounting context.
+relevant to a finance and accounting context.
 
 ---
 
@@ -70,7 +70,7 @@ Deny Bronze and Silver explicitly:
 
 ### Column Masking for Future PII Datasets
 
-When PIA Group onboards datasets containing real client PII — tax IDs, account
+When a team onboards datasets containing real client PII — tax IDs, account
 numbers, personal identifiers — Unity Catalog column masking ensures analysts
 see masked values automatically without any application changes.
 
@@ -141,7 +141,7 @@ Every data access is logged without any additional instrumentation:
 - How many rows were returned
 - Which tool they used (SQL, Python, Power BI)
 
-### Why This Matters for PIA Group
+### Why This Matters
 
 In an accounting and audit context, regulators may ask:
 "Who accessed client revenue data on December 31st?"
@@ -165,7 +165,7 @@ Query audit logs:
 
 ## 5. Data Residency — German Data Stays in Germany
 
-### PIA Group Context
+### Workspace Context
 
 German client data must remain within Germany for legal compliance under
 GDPR and German data protection law (BDSG).
@@ -180,7 +180,7 @@ All data is stored in Azure North Europe region (Frankfurt data centre):
 
 ### Delta Share for Cross-Border Governance
 
-Delta Share allows PIA Group to share governed views internationally without
+Delta Sharing allows the team to share governed views internationally without
 copying raw data across borders:
 
     German Workspace (North Europe — Frankfurt)

@@ -56,11 +56,11 @@ Once the schema was understood, the dbt models were built with that knowledge �
 correct first time with no schema surprises. This mirrors the correct professional
 workflow: explore in a notebook, formalise in dbt.
 
-### Recommended Production Pattern for PIA Group
+### Recommended Production Pattern
 
 Implementation B. The Databricks notebook handles Bronze ingestion — loading raw
 client company data from whatever format it arrives in. dbt handles the mapping
-to PIA Group's standard German model — version-controlled, testable, auditable SQL
+to a typical German enterprise setup — version-controlled, testable, auditable SQL
 that the analytics team can review and understand without Python knowledge.
 
 ---
@@ -171,7 +171,7 @@ The medallion Lakehouse pattern suits this specific business question better tha
 a traditional dimensional model. A fact_reviews table and dim_books dimension would
 add modelling complexity without benefit for the current use case.
 
-For PIA Group's client master data — tracking company names, VAT numbers and legal
+For client master data — tracking company names, VAT numbers and legal
 entities across acquisitions — SCD Type 2 is the correct pattern and would be
 implemented for those dimensions specifically.
 
@@ -179,7 +179,7 @@ implemented for those dimensions specifically.
 
 Delta Lake time travel solves point-in-time querying without the overhead of
 surrogate keys and current flags. For external reference data like GoodReads,
-time travel is sufficient. For PIA Group's own client master data, SCD Type 2
+time travel is sufficient. For client master data, SCD Type 2
 would be implemented.
 
 ---

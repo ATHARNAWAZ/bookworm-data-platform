@@ -60,7 +60,7 @@ RAW → Bronze (Databricks Auto Loader)
                 → Gold (dbt marts)
 ```
 
-**When to use:** Production environments, larger teams, when data contracts and automated testing are required. **This is the recommended pattern for PIA Group.**
+**When to use:** Production environments, larger teams, when data contracts and automated testing are required. **This is the pattern I recommend for production.**
 
 ### Why Both Exist
 
@@ -247,7 +247,7 @@ GRANT SELECT ON SCHEMA piagroup_assessment_bookworm.bookworm_silver
 GRANT SELECT ON SCHEMA piagroup_assessment_bookworm.bookworm_gold
     TO data_scientist;
 
--- Row-level filter for country-based access (PIA Group cross-border)
+-- Row-level filter for country-based access (cross-border access)
 CREATE ROW FILTER filter_by_country
     ON silver_books (country_code)
     AS (country_code = current_user_country());
